@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "374866452282",
+    "project_id": "pfish-f02dd",
+    "storage_bucket": "pfish-f02dd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:374866452282:android:3740fd30b3f05f5f757a03",
+        "android_client_info": {
+          "package_name": "com.example.piratef"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQydAVn6lkdHgPUjT_Y7ZKlfOAHALAmNg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
