@@ -78,21 +78,22 @@ class _SignUpState extends State<SignUp> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color.fromARGB(255, 76, 109, 239),
-              Color.fromARGB(255, 215, 220, 255),
-            ],
-          ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    body: Container(
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+         colors: [
+            Color.fromARGB(255, 182, 231, 255), 
+             Color.fromARGB(255, 3, 20, 105),   // Royal blue
+          ],
         ),
+      ),
+      // ...exi
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
@@ -102,7 +103,7 @@ class _SignUpState extends State<SignUp> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color.fromARGB(121, 255, 255, 255),
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
@@ -129,7 +130,7 @@ class _SignUpState extends State<SignUp> {
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D5AF7),
+                            color: Color.fromARGB(255, 18, 41, 158),
                             letterSpacing: 0.5,
                           ),
                         ),
