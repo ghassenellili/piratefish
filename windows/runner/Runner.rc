@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "piratef" "\0"
+            VALUE "FileDescription", "piratefish" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "piratef" "\0"
+            VALUE "InternalName", "piratefish" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "piratef.exe" "\0"
-            VALUE "ProductName", "piratef" "\0"
+            VALUE "OriginalFilename", "piratefish.exe" "\0"
+            VALUE "ProductName", "piratefish" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
