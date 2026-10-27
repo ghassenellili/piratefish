@@ -6,20 +6,35 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  if (kIsWeb) {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-          apiKey: "AIzaSyC0XWaT7W-snY9bHh3TcnODhjfLUwPaGeY",
-          authDomain: "pfish-f02dd.firebaseapp.com",
-          projectId: "pfish-f02dd",
-          storageBucket: "pfish-f02dd.appspot.com",
-          messagingSenderId: "374866452282",
-          appId: "1:374866452282:web:0ab3de985a05c5db757a03",
-          measurementId: "G-ZMYRBY5X22"
-      ),
-    );
-  } else {
-    await Firebase.initializeApp();
+  const firebaseOptions = FirebaseOptions(
+    apiKey: "AIzaSyApRbFEAUb9bBvC83o4-b_-H-AJgJtSIkU",
+    authDomain: "piratefish-1ea25.firebaseapp.com",
+    projectId: "piratefish-1ea25",
+    storageBucket: "piratefish-1ea25.firebasestorage.app",
+    messagingSenderId: "226030086996",
+    appId: "1:226030086996:web:2ec584ffa79e3305cd76c1",
+    measurementId: "G-0Q1152L4QV",
+  );
+
+  try {
+    if (kIsWeb) {
+      if (Firebase.apps.isNotEmpty) {
+        final currentId = Firebase.app().options.projectId;
+        debugPrint("Current Firebase projectId in memory: $currentId");
+        if (currentId != firebaseOptions.projectId) {
+          debugPrint("Switching from $currentId to ${firebaseOptions.projectId}...");
+          await Firebase.app().delete();
+          await Firebase.initializeApp(options: firebaseOptions);
+        }
+      } else {
+        await Firebase.initializeApp(options: firebaseOptions);
+      }
+      debugPrint("Firebase successfully initialized with: ${Firebase.app().options.projectId}");
+    } else {
+      await Firebase.initializeApp();
+    }
+  } catch (e) {
+    debugPrint("Firebase init: $e");
   }
   
   runApp(const MyApp());

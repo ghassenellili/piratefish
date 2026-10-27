@@ -68,42 +68,38 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     final double subtitleSize = screenWidth < 360 ? 12.0 : 14.0;
     final double bodySize = screenWidth < 360 ? 12.0 : 14.0;
     
-    return Scaffold(
-      key: _scaffoldKey,
-      body: Stack(
-        children: [
-          // Background gradient with custom painter for wave effect
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF0D47A1),  // Deep ocean blue at top
-                  Color(0xFF1565C0),  // Deep blue
-                  Color(0xFF1E88E5),  // Medium blue
-                  Color(0xFF42A5F5),  // Light blue at bottom
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0.0, 0.3, 0.6, 1.0],
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF0D47A1),  // Deep ocean blue at top
+            Color(0xFF1565C0),  // Deep blue
+            Color(0xFF1E88E5),  // Medium blue
+            Color(0xFF42A5F5),  // Light blue at bottom
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0.0, 0.3, 0.6, 1.0],
+        ),
+      ),
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: Colors.transparent,
+        appBar: _buildAppBar(screenWidth),
+        drawer: _buildDrawer(),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: WavePainter(),
               ),
             ),
-            child: CustomPaint(
-              painter: WavePainter(),
-              child: Container(),
-            ),
-          ),
-          
-          // Main content
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: _buildAppBar(screenWidth),
-            drawer: _buildDrawer(),
-            body: _buildBody(titleSize, subtitleSize, bodySize, screenWidth),
-            bottomNavigationBar: _buildBottomNav(),
-            floatingActionButton: _buildFloatingActionButton(),
-            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-          ),
-        ],
+            _buildBody(titleSize, subtitleSize, bodySize, screenWidth),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNav(),
+        floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
   }
@@ -115,11 +111,14 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.transparent,
-      leading: IconButton(
-        icon: Icon(Icons.menu, color: Colors.white, size: iconSize),
-        onPressed: () {
-          _scaffoldKey.currentState?.openDrawer();
-        },
+      leading: Builder(
+        builder: (context) => IconButton(
+          icon: Icon(Icons.menu, color: Colors.white, size: iconSize),
+          tooltip: 'Menu',
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+        ),
       ),
       title: Row(
         children: [
