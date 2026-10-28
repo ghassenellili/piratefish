@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:firebase_auth/firebase_auth.dart';

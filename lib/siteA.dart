@@ -1,6 +1,10 @@
+// ignore_for_file: deprecated_member_use, unused_local_variable
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:piratefish/LoginScreen.dart';
 import 'package:piratefish/api_services/service_api.dart';
+import 'package:piratefish/camera_helper.dart';
 import 'package:piratefish/home.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
@@ -72,7 +76,7 @@ class NotificationModel {
 class MjpegView extends StatefulWidget {
   final String streamUrl;
 
-  const MjpegView({Key? key, required this.streamUrl}) : super(key: key);
+  const MjpegView({super.key, required this.streamUrl});
 
   @override
   State<MjpegView> createState() => _MjpegViewState();
@@ -189,10 +193,10 @@ class NotificationPopup extends StatefulWidget {
   final VoidCallback onDismiss;
 
   const NotificationPopup({
-    Key? key,
+    super.key,
     required this.notification,
     required this.onDismiss,
-  }) : super(key: key);
+  });
 
   @override
   State<NotificationPopup> createState() => _NotificationPopupState();
@@ -386,7 +390,7 @@ class Sitea extends StatefulWidget {
   State<Sitea> createState() => _SiteaState();
 }
 
-class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
+class _SiteaState extends State<Sitea> with TickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   final String raspberryPiIP = "192.168.137.166"; // Raspberry Pi IP
   bool _isDetectionActive = false;
@@ -397,10 +401,13 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
   bool _diseaseDetected = false;
   
   late AnimationController _animationController;
+  late AnimationController _loopController;
   late Animation<double> _fadeAnimation;
+  final List<OceanBubble> _bubbles = [];
   Timer? _refreshTimer;
   Timer? _notificationTimer;
   bool _isStreamAvailable = false;
+  bool _usePcCamera = true;
   
   // Notifications
   List<NotificationModel> _notifications = [];
@@ -728,6 +735,22 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+
+    // Generate random ocean bubbles matching LoginScreen
+    final random = math.Random();
+    for (int i = 0; i < 35; i++) {
+      _bubbles.add(
+        OceanBubble(
+          x: random.nextDouble(),
+          y: random.nextDouble(),
+          size: random.nextDouble() * 10 + 4,
+          speed: random.nextDouble() * 0.0015 + 0.0008,
+          wobbleSpeed: random.nextDouble() * 3 + 1,
+          opacity: random.nextDouble() * 0.35 + 0.1,
+        ),
+      );
+    }
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -737,6 +760,12 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
       parent: _animationController,
       curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
     );
+
+    // Continuous loop controller for alive animations (waves, bubbles, bobbing)
+    _loopController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat();
     
     _animationController.forward();
     
@@ -752,6 +781,7 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
   
   @override
   void dispose() {
+    _loopController.dispose();
     _refreshTimer?.cancel();
     _notificationTimer?.cancel();
     _animationController.dispose();
@@ -767,24 +797,38 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
     return Scaffold(
       body: Stack(
         children: [
-          // Background with gradient and waves
+          // Deep Ocean Animated Background Gradient (matching LoginScreen)
           Container(
+            width: double.infinity,
+            height: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFF0D47A1),
-                  Color(0xFF1565C0),
-                  Color(0xFF1E88E5),
-                  Color(0xFF42A5F5),
+                  Color(0xFF041426), // Deep abyssal navy
+                  Color(0xFF092A52), // Ocean deep
+                  Color(0xFF0D47A1), // Royal navy blue
+                  Color(0xFF0277BD), // Vibrant marine blue
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [0.0, 0.3, 0.6, 1.0],
+                stops: [0.0, 0.35, 0.7, 1.0],
               ),
             ),
-            child: CustomPaint(
-              painter: WavePainter(),
-              child: Container(),
+          ),
+          
+          // Animated Ocean Waves & Rising Bubbles Painter
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _loopController,
+              builder: (context, _) {
+                return CustomPaint(
+                  size: Size(_screenWidth, _screenHeight),
+                  painter: OceanScenePainter(
+                    progress: _loopController.value,
+                    bubbles: _bubbles,
+                  ),
+                );
+              },
             ),
           ),
           
@@ -886,8 +930,12 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
             child: Container(
               padding: getResponsivePadding(all: 12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
               child: Icon(
                 Icons.arrow_back,
@@ -897,33 +945,100 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
             ),
           ),
           
-          // Title
+          // Title with animated Logo
           Flexible(
-            child: Column(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'SITE A',
-                  style: TextStyle(
-                    fontSize: getResponsiveSize(18, 22, 26),
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
-                  ),
+                AnimatedBuilder(
+                  animation: _loopController,
+                  builder: (context, child) {
+                    final floatOffset = math.sin(_loopController.value * 2 * math.pi) * 3;
+                    final shimmerValue = (_loopController.value * 2) % 2.0;
+
+                    return Transform.translate(
+                      offset: Offset(0, floatOffset),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.12),
+                          border: Border.all(
+                            color: const Color(0xFF00E5FF).withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00B0FF).withOpacity(0.35),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(5),
+                        child: ShaderMask(
+                          shaderCallback: (Rect bounds) {
+                            return LinearGradient(
+                              colors: [
+                                Colors.white.withOpacity(0.7),
+                                Colors.white,
+                                Colors.white.withOpacity(0.7),
+                              ],
+                              stops: [
+                                (shimmerValue - 0.3).clamp(0.0, 1.0),
+                                shimmerValue.clamp(0.0, 1.0),
+                                (shimmerValue + 0.3).clamp(0.0, 1.0),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ).createShader(bounds);
+                          },
+                          blendMode: BlendMode.srcATop,
+                          child: Image.asset(
+                            'images/splash.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                Container(
-                  padding: getResponsivePadding(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Surveillance intelligente',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: getResponsiveSize(10, 12, 14),
-                      fontWeight: FontWeight.w500,
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [
+                          Colors.white,
+                          Color(0xFFE0F7FA),
+                          Color(0xFF80D8FF),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(bounds),
+                      child: Text(
+                        'SITE A',
+                        style: TextStyle(
+                          fontSize: getResponsiveSize(18, 22, 26),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ),
-                  ),
+                    Text(
+                      'PIRATEFISH SURVEILLANCE',
+                      style: TextStyle(
+                        color: const Color(0xFF80D8FF),
+                        fontSize: getResponsiveSize(9, 10, 11),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1998,17 +2113,17 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
       margin: getResponsivePadding(bottom: 16, right: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1A237E), Color(0xFF1565C0)],
+          colors: [Color(0xFF00B0FF), Color(0xFF0D47A1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1A237E).withOpacity(0.4),
-            blurRadius: 15,
-            spreadRadius: -5,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF00B0FF).withOpacity(0.4),
+            blurRadius: 16,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -2028,97 +2143,273 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
   }
   
   Widget _buildVideoStreamCard() {
-    return Container(
-      padding: getResponsivePadding(all: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, 10),
-            blurRadius: 20,
-            spreadRadius: -5,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.videocam, color: Colors.blue, size: getResponsiveSize(18, 22, 26)),
-              SizedBox(width: getResponsiveSize(8, 12, 16)),
-              Text(
-                'Flux vidéo avec IA',
-                style: TextStyle(
-                  fontSize: getResponsiveSize(14, 16, 18),
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF333333),
-                ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: getResponsivePadding(all: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF061A33).withOpacity(0.75),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
-              const Spacer(),
-              Container(
-                padding: getResponsivePadding(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (_isDetectionActive || _isDiseaseDetectionActive) ? 
-                         Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: (_isDetectionActive || _isDiseaseDetectionActive) ? Colors.green : Colors.grey,
-                        shape: BoxShape.circle,
-                      ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with Title & Source Toggle
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00B0FF).withOpacity(0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF00B0FF).withOpacity(0.4)),
                     ),
-                    SizedBox(width: getResponsiveSize(4, 6, 8)),
-                    Text(
-                      (_isDetectionActive || _isDiseaseDetectionActive) ? 'IA Active' : 'IA Inactive',
-                      style: TextStyle(
-                        fontSize: getResponsiveSize(10, 12, 14),
-                        fontWeight: FontWeight.w600,
-                        color: (_isDetectionActive || _isDiseaseDetectionActive) ? Colors.green : Colors.grey,
-                      ),
+                    child: const Icon(Icons.videocam_rounded, color: Color(0xFF00E5FF), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Flux Vidéo avec IA',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          _usePcCamera ? 'Caméra de votre PC (Webcam)' : 'Flux réseau Raspberry Pi',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white.withOpacity(0.65),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
+                  // Toggle Button between PC Camera and Pi Stream
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () => setState(() => _usePcCamera = true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              gradient: _usePcCamera
+                                  ? const LinearGradient(colors: [Color(0xFF00B0FF), Color(0xFF0D47A1)])
+                                  : null,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.laptop, size: 14, color: _usePcCamera ? Colors.white : Colors.white60),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'PC',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: _usePcCamera ? FontWeight.bold : FontWeight.normal,
+                                    color: _usePcCamera ? Colors.white : Colors.white60,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setState(() => _usePcCamera = false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              gradient: !_usePcCamera
+                                  ? const LinearGradient(colors: [Color(0xFF00B0FF), Color(0xFF0D47A1)])
+                                  : null,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.router, size: 14, color: !_usePcCamera ? Colors.white : Colors.white60),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Réseau',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: !_usePcCamera ? FontWeight.bold : FontWeight.normal,
+                                    color: !_usePcCamera ? Colors.white : Colors.white60,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Video Container
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Stack(
+                    children: [
+                      // Video content: PC Webcam or Pi Stream
+                      Positioned.fill(
+                        child: _usePcCamera
+                            ? getPcCameraView(
+                                width: double.infinity,
+                                height: double.infinity,
+                                onError: () {},
+                                onReady: () {},
+                              )
+                            : (_isStreamAvailable
+                                ? MjpegView(streamUrl: "http://$raspberryPiIP:5000/video_feed")
+                                : Container(
+                                    color: const Color(0xFF041426),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.videocam_off_rounded,
+                                              color: Colors.white.withOpacity(0.4), size: 45),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            "Flux réseau non disponible",
+                                            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          ElevatedButton.icon(
+                                            onPressed: () => setState(() => _usePcCamera = true),
+                                            icon: const Icon(Icons.laptop, size: 16),
+                                            label: const Text("Activer la Caméra PC"),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF00B0FF),
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )),
+                      ),
+
+                      // Live overlay badge (Top-Left)
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF00E676),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFF00E676),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _usePcCamera ? 'EN DIRECT (CAMÉRA PC)' : 'EN DIRECT (PI)',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // IA Detection status pill (Top-Right)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: (_isDetectionActive || _isDiseaseDetectionActive)
+                                  ? const Color(0xFF00E676).withOpacity(0.5)
+                                  : Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.auto_awesome,
+                                size: 12,
+                                color: (_isDetectionActive || _isDiseaseDetectionActive)
+                                    ? const Color(0xFF00E676)
+                                    : const Color(0xFF00E5FF),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                (_isDetectionActive || _isDiseaseDetectionActive)
+                                    ? 'IA Active'
+                                    : 'Analyse IA Prête',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: (_isDetectionActive || _isDiseaseDetectionActive)
+                                      ? const Color(0xFF00E676)
+                                      : const Color(0xFF00E5FF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          SizedBox(height: getResponsiveSize(12, 16, 20)),
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: _isStreamAvailable
-                  ? MjpegView(streamUrl: "http://$raspberryPiIP:5000/video_feed")
-                  : Container(
-                      color: Colors.grey[200],
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.videocam_off, color: Colors.grey[400], size: getResponsiveSize(40, 50, 60)),
-                            SizedBox(height: getResponsiveSize(8, 12, 16)),
-                            Text(
-                              "Flux vidéo non disponible",
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: getResponsiveSize(12, 14, 16),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -2449,34 +2740,4 @@ class _SiteaState extends State<Sitea> with SingleTickerProviderStateMixin {
     }
   }
 }
-
-// Wave painter for background decoration
-class WavePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF1E88E5).withOpacity(0.2)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(0, size.height * 0.8);
-    path.quadraticBezierTo(
-      size.width * 0.25, size.height * 0.7,
-      size.width * 0.5, size.height * 0.8,
-    );
-    path.quadraticBezierTo(
-      size.width * 0.75, size.height * 0.9,
-      size.width, size.height * 0.8,
-    );
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
-  }
-}
+

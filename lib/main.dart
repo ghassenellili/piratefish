@@ -47,6 +47,20 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'PirateFish',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF041426),
+        primaryColor: const Color(0xFF00B0FF),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF00B0FF),
+          brightness: Brightness.dark,
+          primary: const Color(0xFF00B0FF),
+          secondary: const Color(0xFF00E5FF),
+          surface: const Color(0xFF061A33),
+        ),
+        useMaterial3: true,
+      ),
       home: const Splashscreen(),
     );
   }

@@ -1,136 +1,119 @@
+// ignore_for_file: deprecated_member_use
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:piratefish/LoginScreen.dart';
 
 class Splashscreen extends StatefulWidget {
   const Splashscreen({super.key});
 
   @override
-  _SplashscreenState createState() => _SplashscreenState();
+  State<Splashscreen> createState() => _SplashscreenState();
 }
 
-class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _logoScaleAnimation;
-  late Animation<double> _logoOpacityAnimation;
-  late Animation<double> _logoRotateAnimation;
-  late Animation<double> _textSlideAnimation;
-  late Animation<double> _textOpacityAnimation;
-  late Animation<double> _shimmerAnimation;
-  late Animation<double> _particleAnimation;
-  final math.Random _random = math.Random();
+class _SplashscreenState extends State<Splashscreen> with TickerProviderStateMixin {
+  final List<OceanBubble> _bubbles = [];
 
-  // Particles for underwater effect
-  final List<Particle> _particles = [];
+  // Controllers matching LoginScreen
+  late AnimationController _introController;
+  late AnimationController _loopController;
+
+  // Intro animations
+  late Animation<double> _logoScaleAnimation;
+  late Animation<double> _logoRotateAnimation;
+  late Animation<double> _contentSlideAnimation;
+  late Animation<double> _contentFadeAnimation;
+  late Animation<double> _progressAnimation;
+
+  Timer? _navTimer;
 
   @override
   void initState() {
     super.initState();
 
-    // Generate random particles
-    for (int i = 0; i < 30; i++) {
-      _particles.add(Particle(
-        x: _random.nextDouble() * 400,
-        y: _random.nextDouble() * 800,
-        size: _random.nextDouble() * 8 + 2,
-        speed: _random.nextDouble() * 2 + 1,
-      ));
+    // 1. Generate random ocean bubbles (same as LoginScreen)
+    final random = math.Random();
+    for (int i = 0; i < 35; i++) {
+      _bubbles.add(
+        OceanBubble(
+          x: random.nextDouble(),
+          y: random.nextDouble(),
+          size: random.nextDouble() * 10 + 4,
+          speed: random.nextDouble() * 0.0015 + 0.0008,
+          wobbleSpeed: random.nextDouble() * 3 + 1,
+          opacity: random.nextDouble() * 0.35 + 0.1,
+        ),
+      );
     }
 
-    // Initialize animation controller with longer duration for smoother animations
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 3500),
+    // 2. Intro entrance controller
+    _introController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
-    // Logo scale animation - starts small and grows to full size
-    _logoScaleAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
-    ));
+    _logoScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _introController,
+        curve: const Interval(0.0, 0.65, curve: Curves.elasticOut),
+      ),
+    );
 
-    // Logo opacity animation
-    _logoOpacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
-    ));
-    
-    // Logo subtle rotation animation
-    _logoRotateAnimation = Tween<double>(
-      begin: -0.1,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
+    _logoRotateAnimation = Tween<double>(begin: -0.15, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _introController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
 
-    // Text slide animation - slides in from bottom
-    _textSlideAnimation = Tween<double>(
-      begin: 50.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.4, 0.7, curve: Curves.easeOut),
-    ));
+    _contentSlideAnimation = Tween<double>(begin: 35.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _introController,
+        curve: const Interval(0.35, 0.9, curve: Curves.easeOutCubic),
+      ),
+    );
 
-    // Text opacity animation
-    _textOpacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.4, 0.7, curve: Curves.easeIn),
-    ));
+    _contentFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _introController,
+        curve: const Interval(0.35, 0.85, curve: Curves.easeIn),
+      ),
+    );
 
-    // Shimmer effect animation
-    _shimmerAnimation = Tween<double>(
-      begin: 0.0,
-      end: 2.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.7, 1.0, curve: Curves.easeInOut),
-    ));
-    
-    // Particles animation
-    _particleAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.linear,
-    ));
+    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _introController,
+        curve: const Interval(0.2, 0.95, curve: Curves.easeInOut),
+      ),
+    );
 
-    _controller.forward();
+    // 3. Continuous loop controller for alive animations (waves, bubbles, bobbing, shimmer)
+    _loopController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat();
 
-    // Navigate to Login screen after animations complete
-    Timer(const Duration(milliseconds: 4500), () {
+    _introController.forward();
+
+    // 4. Smooth transition to Login screen after animation sequence
+    _navTimer = Timer(const Duration(milliseconds: 3200), () {
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const Login(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            const begin = Offset(0.0, 0.3);
-            const end = Offset.zero;
-            const curve = Curves.easeOutCubic;
-            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-            var offsetAnimation = animation.drive(tween);
-            
-            var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
-                .animate(CurvedAnimation(parent: animation, curve: curve));
-            
+          pageBuilder: (_, __, ___) => const Login(),
+          transitionDuration: const Duration(milliseconds: 800),
+          transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(
-              opacity: fadeAnimation,
-              child: SlideTransition(position: offsetAnimation, child: child),
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
             );
           },
-          transitionDuration: const Duration(milliseconds: 800),
         ),
       );
     });
@@ -138,464 +121,409 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    _controller.dispose();
+    _navTimer?.cancel();
+    _introController.dispose();
+    _loopController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
+
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          // Update particles positions
-          for (var particle in _particles) {
-            particle.y -= particle.speed * _particleAnimation.value;
-            if (particle.y < 0) {
-              particle.y = MediaQuery.of(context).size.height;
-              particle.x = _random.nextDouble() * MediaQuery.of(context).size.width;
-            }
-          }
-          
-          return Container(
-            decoration: BoxDecoration(
+      body: Stack(
+        children: [
+          // 1. Deep Ocean Animated Background Gradient (identical to LoginScreen)
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: const [
-                  Color(0xFF0D47A1),  // Deep ocean blue at top
-                  Color(0xFF1565C0),  // Deep blue
-                  Color(0xFF1E88E5),  // Medium blue
-                  Color(0xFF42A5F5),  // Light blue at bottom
+                colors: [
+                  Color(0xFF041426), // Deep abyssal navy
+                  Color(0xFF092A52), // Ocean deep
+                  Color(0xFF0D47A1), // Royal navy blue
+                  Color(0xFF0277BD), // Vibrant marine blue
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0.0, 0.3, 0.6, 1.0],
+                stops: [0.0, 0.35, 0.7, 1.0],
               ),
             ),
-            child: Stack(
-              children: [
-                // Background particles
-                CustomPaint(
-                  size: Size(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height),
-                  painter: ParticlePainter(_particles),
-                ),
-            
-                // Background wave pattern
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: WavePainter(_controller.value),
-                  ),
-                ),
-                
-                // Main content
-                Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Animated logo
-                        Transform.rotate(
-                          angle: _logoRotateAnimation.value,
-                          child: Transform.scale(
-                            scale: _logoScaleAnimation.value,
-                            child: Opacity(
-                              opacity: _logoOpacityAnimation.value,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Glow effect
-                                  Container(
-                                    width: 240,
-                                    height: 240,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: RadialGradient(
-                                        colors: [
-                                          Colors.white.withOpacity(0.3),
-                                          Colors.white.withOpacity(0.1),
-                                          Colors.white.withOpacity(0.05),
-                                          Colors.transparent,
-                                        ],
-                                        stops: const [0.0, 0.3, 0.6, 1.0],
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  // Inner circle
-                                  Container(
-                                    width: 210,
-                                    height: 210,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.white.withOpacity(0.12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.blue.withOpacity(0.3),
-                                          blurRadius: 20,
-                                          spreadRadius: 5,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  
-                                  // Logo with shimmer effect
-                                  ShaderMask(
-                                    shaderCallback: (Rect bounds) {
-                                      return LinearGradient(
-                                        colors: [
-                                          Colors.white.withOpacity(0.2),
-                                          Colors.white,
-                                          Colors.white.withOpacity(0.2),
-                                        ],
-                                        stops: [
-                                          _shimmerAnimation.value < 1.0 ? 0.0 : _shimmerAnimation.value - 1.0,
-                                          _shimmerAnimation.value < 1.0 ? _shimmerAnimation.value : 1.0,
-                                          _shimmerAnimation.value < 0.5 ? 0.5 : 1.0,
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ).createShader(bounds);
-                                    },
-                                    blendMode: BlendMode.srcATop,
-                                    child: Container(
-                                      width: 200,
-                                      height: 200,
-                                      padding: const EdgeInsets.all(20),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.3),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Image.asset(
-                                        'images/splash.png',
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  // Ripple effect
-                                  _buildRippleEffect(),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 40),
-                        
-                        // Animated title text
-                        Transform.translate(
-                          offset: Offset(0, _textSlideAnimation.value),
-                          child: Opacity(
-                            opacity: _textOpacityAnimation.value,
-                            child: ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return const LinearGradient(
-                                  colors: [
-                                    Colors.white,
-                                    Color(0xFFE3F2FD),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ).createShader(bounds);
-                              },
-                              blendMode: BlendMode.srcIn,
-                              child: const Text(
-                                "Bienvenue sur PirateFish",
-                                style: TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                  shadows: [
-                                    Shadow(
-                                      blurRadius: 10.0,
-                                      color: Color.fromARGB(150, 0, 0, 100),
-                                      offset: Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 20),
-                        
-                        // Animated subtitle text
-                        Transform.translate(
-                          offset: Offset(0, _textSlideAnimation.value),
-                          child: Opacity(
-                            opacity: _textOpacityAnimation.value,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.white.withOpacity(0.15),
-                                    Colors.white.withOpacity(0.25),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    spreadRadius: 0,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              child: const Text(
-                                "Votre compagnon de pêche intelligent",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Animated footer
-                Positioned(
-                  bottom: 24,
-                  left: 0,
-                  right: 0,
-                  child: Opacity(
-                    opacity: _textOpacityAnimation.value,
-                    child: Column(
-                      children: [
-                        // Loading indicator
-                        SizedBox(
-                          width: 30,
-                          height: 30,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.7)),
-                            strokeWidth: 2,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Version
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.verified,
-                              size: 12,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "v1.0.0",
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          ),
 
-                // Watermark
-                Positioned(
-                  top: 40,
-                  right: 20,
-                  child: Opacity(
-                    opacity: _textOpacityAnimation.value * 0.7,
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.water,
-                          color: Colors.white.withOpacity(0.5),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "PREMIUM",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
+          // 2. Animated Ocean Waves & Bubbles Painter (identical to LoginScreen)
+          AnimatedBuilder(
+            animation: _loopController,
+            builder: (context, _) {
+              return CustomPaint(
+                size: Size(size.width, size.height),
+                painter: OceanScenePainter(
+                  progress: _loopController.value,
+                  bubbles: _bubbles,
+                ),
+              );
+            },
+          ),
+
+          // 3. Ambient Top Light Glow Accent
+          Positioned(
+            top: -100,
+            left: size.width * 0.2,
+            right: size.width * 0.2,
+            child: Container(
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF00E5FF).withOpacity(0.18),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 4. Center Content: Animated Logo + Brand Typography + Loading Bar
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Animated Floating Logo matching LoginScreen exactly
+                      _buildAnimatedLogo(),
+
+                      const SizedBox(height: 36),
+
+                      // Brand Titles with Slide & Fade Animation
+                      _buildAnimatedTypography(),
+
+                      const SizedBox(height: 40),
+
+                      // Refined Glassmorphic Loading Indicator
+                      _buildLoadingIndicator(),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          );
-        },
+          ),
+
+          // 5. Footer Badge (identical to LoginScreen)
+          Positioned(
+            bottom: 28,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: _buildFooterBadge(),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // Ripple effect around logo
-  Widget _buildRippleEffect() {
+  /// Logo identical in style and animation to LoginScreen with Hero integration
+  Widget _buildAnimatedLogo() {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([_introController, _loopController]),
       builder: (context, child) {
-        if (_controller.value < 0.6) return const SizedBox.shrink();
-        
-        final rippleSize = 200 + (50 * math.sin((_controller.value - 0.6) * 6));
-        final opacity = math.max(0.0, 0.3 - (_controller.value - 0.6) * 0.5);
-        
-        return Container(
-          width: rippleSize,
-          height: rippleSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withOpacity(opacity),
-              width: 2,
+        // Continuous bobbing float motion (identical to LoginScreen)
+        final floatOffset = math.sin(_loopController.value * 2 * math.pi) * 6;
+        final shimmerValue = (_loopController.value * 2) % 2.0;
+
+        return Transform.translate(
+          offset: Offset(0, floatOffset),
+          child: Transform.rotate(
+            angle: _logoRotateAnimation.value,
+            child: Transform.scale(
+              scale: _logoScaleAnimation.value,
+              child: Opacity(
+                opacity: _introController.value.clamp(0.0, 1.0),
+                child: Hero(
+                  tag: 'piratefish_logo',
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Ambient Radial Glow
+                      Container(
+                        width: 190,
+                        height: 190,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFF00E5FF).withOpacity(0.40),
+                              const Color(0xFF0091EA).withOpacity(0.20),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.45, 1.0],
+                          ),
+                        ),
+                      ),
+
+                      // Outer glowing halo ring
+                      Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.4),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00B0FF).withOpacity(0.45),
+                              blurRadius: 28,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Inner Glass Circle Container
+                      Container(
+                        width: 132,
+                        height: 132,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.45),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ShaderMask(
+                          shaderCallback: (Rect bounds) {
+                            return LinearGradient(
+                              colors: [
+                                Colors.white.withOpacity(0.7),
+                                Colors.white,
+                                Colors.white.withOpacity(0.7),
+                              ],
+                              stops: [
+                                (shimmerValue - 0.3).clamp(0.0, 1.0),
+                                shimmerValue.clamp(0.0, 1.0),
+                                (shimmerValue + 0.3).clamp(0.0, 1.0),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ).createShader(bounds);
+                          },
+                          blendMode: BlendMode.srcATop,
+                          child: Image.asset(
+                            'images/splash.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         );
       },
     );
   }
-}
 
-// Custom painter for decorative wave pattern in background
-class WavePainter extends CustomPainter {
-  final double animationValue;
-  
-  WavePainter(this.animationValue);
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    // First wave (bottom)
-    _paintWave(
-      canvas, 
-      size,
-      color: Colors.white.withOpacity(0.05),
-      amplitude: size.height * 0.05,
-      frequency: 1.5,
-      phase: animationValue * 2,
-      baseHeight: size.height * 0.75,
+  /// Title & Subtitle with smooth slide-up and fade-in matching Login card animation
+  Widget _buildAnimatedTypography() {
+    return AnimatedBuilder(
+      animation: _introController,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _contentSlideAnimation.value),
+          child: Opacity(
+            opacity: _contentFadeAnimation.value,
+            child: child,
+          ),
+        );
+      },
+      child: Column(
+        children: [
+          // Main Brand Title
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [
+                Colors.white,
+                Color(0xFFE0F7FA),
+                Color(0xFF80D8FF),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ).createShader(bounds),
+            child: const Text(
+              "PIRATEFISH",
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 4.5,
+                shadows: [
+                  Shadow(
+                    color: Color(0x8000E5FF),
+                    blurRadius: 18,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Glassmorphic Tagline Pill
+          ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.22),
+                    width: 1,
+                  ),
+                ),
+                child: const Text(
+                  "Votre compagnon de pêche intelligent",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFE1F5FE),
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
-    
-    // Second wave (middle)
-    _paintWave(
-      canvas, 
-      size,
-      color: Colors.white.withOpacity(0.07),
-      amplitude: size.height * 0.04,
-      frequency: 2.0,
-      phase: animationValue * -3,
-      baseHeight: size.height * 0.5,
+  }
+
+  /// Elegant oceanic loading bar with glowing progress
+  Widget _buildLoadingIndicator() {
+    return AnimatedBuilder(
+      animation: _introController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _contentFadeAnimation.value,
+          child: Column(
+            children: [
+              // Progress Bar Track
+              Container(
+                width: 160,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 160 * _progressAnimation.value,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF00B0FF),
+                          Color(0xFF00E5FF),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E5FF).withOpacity(0.6),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Status text
+              Text(
+                "Initialisation du système...",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.65),
+                  fontSize: 12,
+                  letterSpacing: 1.0,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
-    
-    // Third wave (top)
-    _paintWave(
-      canvas, 
-      size,
-      color: Colors.white.withOpacity(0.04),
-      amplitude: size.height * 0.03,
-      frequency: 2.5,
-      phase: animationValue * 4,
-      baseHeight: size.height * 0.3,
+  }
+
+  /// Footer badge matching LoginScreen exactly
+  Widget _buildFooterBadge() {
+    return AnimatedBuilder(
+      animation: _introController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _contentFadeAnimation.value,
+          child: child,
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.25),
+            width: 1,
+          ),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.shield_outlined,
+              color: Color(0xFF80D8FF),
+              size: 15,
+            ),
+            SizedBox(width: 8),
+            Text(
+              "PIRATEFISH SECURE SYSTEM",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-  }
-  
-  void _paintWave(
-    Canvas canvas, 
-    Size size, {
-    required Color color,
-    required double amplitude,
-    required double frequency,
-    required double phase,
-    required double baseHeight,
-  }) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    
-    final path = Path();
-    
-    path.moveTo(0, baseHeight);
-    
-    for (double x = 0; x <= size.width; x++) {
-      double y = math.sin((x / size.width * frequency * math.pi * 2) + phase) * amplitude;
-      path.lineTo(x, baseHeight + y);
-    }
-    
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant WavePainter oldDelegate) {
-    return oldDelegate.animationValue != animationValue;
-  }
-}
-
-// Particle class for underwater effect
-class Particle {
-  double x;
-  double y;
-  double size;
-  double speed;
-  
-  Particle({
-    required this.x,
-    required this.y,
-    required this.size,
-    required this.speed,
-  });
-}
-
-// Painter for underwater particles
-class ParticlePainter extends CustomPainter {
-  final List<Particle> particles;
-  
-  ParticlePainter(this.particles);
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (var particle in particles) {
-      final paint = Paint()
-        ..color = Colors.white.withOpacity(0.2 * (particle.size / 10))
-        ..style = PaintingStyle.fill;
-      
-      canvas.drawCircle(
-        Offset(particle.x, particle.y),
-        particle.size * 0.5,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant ParticlePainter oldDelegate) {
-    return true;
-  }
-}
-
-// Helper extension for Random
-extension RandomExtension on math.Random {
-  double nextDouble() {
-    return math.Random().nextDouble();
   }
 }

@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:piratefish/LoginScreen.dart';
 import 'package:piratefish/siteA.dart';
@@ -16,19 +18,36 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
+class _HomeState extends State<Home> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final String _formattedDate = DateFormat('EEEE, d MMMM yyyy').format(DateTime.now());
   late AnimationController _animationController;
+  late AnimationController _loopController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+  final List<OceanBubble> _bubbles = [];
   
   int _selectedTab = 0;
-  final List<String> _tabs = ['Tableau de bord', 'Statistiques', 'Paramètres'];
   
   @override
   void initState() {
     super.initState();
+
+    // 1. Generate random ocean bubbles matching LoginScreen
+    final random = math.Random();
+    for (int i = 0; i < 35; i++) {
+      _bubbles.add(
+        OceanBubble(
+          x: random.nextDouble(),
+          y: random.nextDouble(),
+          size: random.nextDouble() * 10 + 4,
+          speed: random.nextDouble() * 0.0015 + 0.0008,
+          wobbleSpeed: random.nextDouble() * 3 + 1,
+          opacity: random.nextDouble() * 0.35 + 0.1,
+        ),
+      );
+    }
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -46,12 +65,19 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       parent: _animationController,
       curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic),
     ));
+
+    // Continuous loop controller for alive animations (waves, bubbles, floating)
+    _loopController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat();
     
     _animationController.forward();
   }
   
   @override
   void dispose() {
+    _loopController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -72,14 +98,14 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Color(0xFF0D47A1),  // Deep ocean blue at top
-            Color(0xFF1565C0),  // Deep blue
-            Color(0xFF1E88E5),  // Medium blue
-            Color(0xFF42A5F5),  // Light blue at bottom
+            Color(0xFF041426), // Deep abyssal navy
+            Color(0xFF092A52), // Ocean deep
+            Color(0xFF0D47A1), // Royal navy blue
+            Color(0xFF0277BD), // Vibrant marine blue
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          stops: [0.0, 0.3, 0.6, 1.0],
+          stops: [0.0, 0.35, 0.7, 1.0],
         ),
       ),
       child: Scaffold(
@@ -89,9 +115,19 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
         drawer: _buildDrawer(),
         body: Stack(
           children: [
+            // Continuous animated fluid ocean waves and rising bubbles (matching LoginScreen)
             Positioned.fill(
-              child: CustomPaint(
-                painter: WavePainter(),
+              child: AnimatedBuilder(
+                animation: _loopController,
+                builder: (context, _) {
+                  return CustomPaint(
+                    size: Size(screenWidth, screenHeight),
+                    painter: OceanScenePainter(
+                      progress: _loopController.value,
+                      bubbles: _bubbles,
+                    ),
+                  );
+                },
               ),
             ),
             _buildBody(titleSize, subtitleSize, bodySize, screenWidth),
@@ -122,23 +158,81 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ),
       title: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
+          AnimatedBuilder(
+            animation: _loopController,
+            builder: (context, child) {
+              final floatOffset = math.sin(_loopController.value * 2 * math.pi) * 3;
+              final shimmerValue = (_loopController.value * 2) % 2.0;
+
+              return Transform.translate(
+                offset: Offset(0, floatOffset),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.12),
+                    border: Border.all(
+                      color: const Color(0xFF00E5FF).withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00B0FF).withOpacity(0.35),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(5),
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.7),
+                          Colors.white,
+                          Colors.white.withOpacity(0.7),
+                        ],
+                        stops: [
+                          (shimmerValue - 0.3).clamp(0.0, 1.0),
+                          shimmerValue.clamp(0.0, 1.0),
+                          (shimmerValue + 0.3).clamp(0.0, 1.0),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.srcATop,
+                    child: Image.asset(
+                      'images/splash.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'SmartAquaFarm',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: titleSize,
-                letterSpacing: 0.5,
+            child: ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [
+                  Colors.white,
+                  Color(0xFFE0F7FA),
+                  Color(0xFF80D8FF),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ).createShader(bounds),
+              child: Text(
+                'PIRATEFISH',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: titleSize,
+                  letterSpacing: 1.5,
+                ),
               ),
             ),
           ),
@@ -187,9 +281,9 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [
+                Color(0xFF041426),
+                Color(0xFF092A52),
                 Color(0xFF0D47A1),
-                Color(0xFF1565C0),
-                Color(0xFF1E88E5),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -1931,24 +2025,39 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF061A33).withOpacity(0.85),
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.18),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.35),
             blurRadius: 20,
-            spreadRadius: -5,
-            offset: const Offset(0, 5),
+            spreadRadius: -2,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: const Color(0xFF00E5FF).withOpacity(0.15),
+            blurRadius: 15,
+            spreadRadius: -3,
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(0, Icons.dashboard_outlined, 'Tableau'),
-          _buildNavItem(1, Icons.bar_chart_outlined, 'Stats'),
-          _buildNavItem(2, Icons.settings_outlined, 'Réglages'),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.dashboard_rounded, 'Tableau'),
+              _buildNavItem(1, Icons.bar_chart_rounded, 'Stats'),
+              _buildNavItem(2, Icons.settings_rounded, 'Réglages'),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1968,28 +2077,37 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           decoration: BoxDecoration(
             gradient: isSelected 
               ? const LinearGradient(
-                  colors: [Color(0xFF1A237E), Color(0xFF1565C0)],
+                  colors: [Color(0xFF00B0FF), Color(0xFF0D47A1)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ) 
               : null,
             borderRadius: BorderRadius.circular(30),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF00B0FF).withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
-                color: isSelected ? Colors.white : Colors.grey,
+                color: isSelected ? Colors.white : Colors.white60,
                 size: 24,
               ),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey,
+                  color: isSelected ? Colors.white : Colors.white60,
                   fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -2004,17 +2122,17 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1A237E), Color(0xFF1565C0)],
+          colors: [Color(0xFF00B0FF), Color(0xFF0D47A1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1A237E).withOpacity(0.4),
-            blurRadius: 15,
-            spreadRadius: -5,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF00B0FF).withOpacity(0.4),
+            blurRadius: 16,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -2089,76 +2207,4 @@ class _DashboardMetric extends StatelessWidget {
       ],
     );
   }
-}
-
-class WavePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // First wave (bottom)
-    _paintWave(
-      canvas, 
-      size,
-      color: Colors.white.withOpacity(0.05),
-      amplitude: size.height * 0.05,
-      frequency: 1.5,
-      phase: 0,
-      baseHeight: size.height * 0.75,
-    );
-    
-    // Second wave (middle)
-    _paintWave(
-      canvas, 
-      size,
-      color: Colors.white.withOpacity(0.07),
-      amplitude: size.height * 0.04,
-      frequency: 2.0,
-      phase: math.pi,
-      baseHeight: size.height * 0.5,
-    );
-    
-    // Third wave (top)
-    _paintWave(
-      canvas, 
-      size,
-      color: Colors.white.withOpacity(0.04),
-      amplitude: size.height * 0.03,
-      frequency: 2.5,
-      phase: math.pi / 2,
-      baseHeight: size.height * 0.3,
-    );
-  }
-  
-  void _paintWave(
-    Canvas canvas, 
-    Size size, {
-    required Color color,
-    required double amplitude,
-    required double frequency,
-    required double phase,
-    required double baseHeight,
-  }) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    
-    final path = Path();
-    
-    path.moveTo(0, baseHeight);
-    
-    for (double x = 0; x <= size.width; x++) {
-      double y = math.sin((x / size.width * frequency * math.pi * 2) + phase) * amplitude;
-      path.lineTo(x, baseHeight + y);
-    }
-    
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
-  }
-}
+}
